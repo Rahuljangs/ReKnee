@@ -31,7 +31,18 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
+
+# Firebase credentials (NEVER commit)
+google-services.json
+GoogleService-Info.plist
+play-store-service-account.json
+firebase-debug.log
+firebase-debug.*.log
+
+# Cloud Functions build output
+functions/lib/
 
 # typescript
 *.tsbuildinfo
