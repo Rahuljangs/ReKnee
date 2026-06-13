@@ -33,6 +33,8 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
     "typescript": "~6.0.3"
   },
   "scripts": {

@@ -1,7 +1,11 @@
+import { Platform } from 'react-native';
 import { LLM_API_URL, LLM_API_KEY, LLM_MODEL } from '@/src/config/constants';
 import type { RehabPhase, GeminiExtractedData } from '@/src/types';
 import { PHASE_NAMES } from '@/src/config/constants';
 import { getExercisesForPhase } from './ExerciseRegistry';
+
+const PROXY_URL = 'http://localhost:3001/api/chat';
+const useProxy = Platform.OS === 'web';
 
 interface ConversationMessage {
   role: 'user' | 'assistant' | 'system';
@@ -100,11 +104,11 @@ export async function callGeminiDirectly(
     max_tokens: 1024,
   };
 
-  const response = await fetch(LLM_API_URL, {
+  const response = await fetch(useProxy ? PROXY_URL : LLM_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${LLM_API_KEY}`,
+      ...(useProxy ? {} : { 'Authorization': `Bearer ${LLM_API_KEY}` }),
     },
     body: JSON.stringify(body),
   });
