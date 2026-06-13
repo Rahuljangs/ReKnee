@@ -125,7 +125,7 @@ async function sendMessageLocal(
       currentPhase: profile.currentPhase,
       weeksPostOp: calculateWeeksPostOp(profile.surgeryDate),
       daysPostOp: calculateDaysPostOp(profile.surgeryDate),
-      graftType: profile.graftType,
+      graftType: profile.graftType === 'other' ? (profile.graftTypeCustom || 'other') : profile.graftType,
       recentSymptoms: [...new Set(recentSymptoms)],
       recentPainLevels,
     });

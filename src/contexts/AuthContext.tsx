@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import type { UserProfile, GraftType } from '@/src/types';
@@ -14,7 +14,13 @@ interface AuthContextValue extends AuthState {
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
-  saveOnboardingProfile: (surgeryDate: Date, graftType: GraftType, initialPhase: number, name: string) => Promise<void>;
+  saveOnboardingProfile: (data: {
+    surgeryDate: Date;
+    graftType: GraftType;
+    graftTypeCustom?: string;
+    initialPhase: number;
+    name: string;
+  }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -95,33 +101,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function signIn() {
+  const signIn = useCallback(async () => {
     if (Platform.OS === 'web') {
       const user = { uid: 'web_user_' + Date.now().toString(36), displayName: '', email: '' };
       await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
-      const profileJson = await AsyncStorage.getItem(STORAGE_KEYS.PROFILE);
-      const profile = profileJson ? deserializeProfile(JSON.parse(profileJson)) : null;
-      setState({ user, profile, loading: false, isNewUser: !profile });
+      setState({ user, profile: null, loading: false, isNewUser: true });
       return;
     }
 
-    try {
-      const auth = require('@react-native-firebase/auth').default;
-      const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+    const auth = require('@react-native-firebase/auth').default;
+    const { GoogleSignin } = require('@react-native-google-signin/google-signin');
 
-      await GoogleSignin.hasPlayServices();
-      const response = await GoogleSignin.signIn();
-      const idToken = response.data?.idToken;
-      if (!idToken) throw new Error('No ID token received');
-      const credential = auth.GoogleAuthProvider.credential(idToken);
-      await auth().signInWithCredential(credential);
-    } catch (error) {
-      console.error('Google Sign-In error:', error);
-      throw error;
-    }
-  }
+    await GoogleSignin.hasPlayServices();
+    const response = await GoogleSignin.signIn();
+    const idToken = response.data?.idToken;
+    if (!idToken) throw new Error('No ID token received');
+    const credential = auth.GoogleAuthProvider.credential(idToken);
+    const result = await auth().signInWithCredential(credential);
 
-  async function signOut() {
+    const user = {
+      uid: result.user.uid,
+      displayName: result.user.displayName ?? '',
+      email: result.user.email ?? '',
+    };
+    await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+
+    const profileJson = await AsyncStorage.getItem(STORAGE_KEYS.PROFILE);
+    const profile = profileJson ? deserializeProfile(JSON.parse(profileJson)) : null;
+    setState({ user, profile, loading: false, isNewUser: !profile });
+  }, []);
+
+  const signOut = useCallback(async () => {
     await AsyncStorage.multiRemove([
       STORAGE_KEYS.USER, STORAGE_KEYS.PROFILE,
       '@reknee_messages', '@reknee_daily_logs', '@reknee_completed_exercises',
@@ -137,15 +147,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     setState({ user: null, profile: null, loading: false, isNewUser: false });
-  }
+  }, []);
 
-  async function saveOnboardingProfile(surgeryDate: Date, graftType: GraftType, initialPhase: number, name: string) {
+  const saveOnboardingProfile = useCallback(async (data: {
+    surgeryDate: Date;
+    graftType: GraftType;
+    graftTypeCustom?: string;
+    initialPhase: number;
+    name: string;
+  }) => {
+    const currentUser = state.user;
+    if (!currentUser) throw new Error('No user signed in');
+
     const profile: UserProfile = {
-      uid: state.user!.uid,
-      displayName: name || state.user!.displayName || '',
-      surgeryDate,
-      graftType,
-      currentPhase: initialPhase as UserProfile['currentPhase'],
+      uid: currentUser.uid,
+      displayName: data.name || currentUser.displayName || '',
+      email: currentUser.email || '',
+      surgeryDate: data.surgeryDate,
+      graftType: data.graftType,
+      graftTypeCustom: data.graftTypeCustom,
+      currentPhase: data.initialPhase as UserProfile['currentPhase'],
       phaseUpdatedAt: new Date(),
       isPremium: true,
       pushToken: null,
@@ -154,15 +175,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     await AsyncStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
     setState((prev) => ({ ...prev, profile, isNewUser: false }));
-  }
+  }, [state.user]);
 
-  async function refreshProfile() {
+  const refreshProfile = useCallback(async () => {
     const profileJson = await AsyncStorage.getItem(STORAGE_KEYS.PROFILE);
     if (profileJson) {
       const profile = deserializeProfile(JSON.parse(profileJson));
       setState((prev) => ({ ...prev, profile, isNewUser: false }));
     }
-  }
+  }, []);
 
   return (
     <AuthContext.Provider

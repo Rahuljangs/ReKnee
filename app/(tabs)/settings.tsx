@@ -66,11 +66,15 @@ export default function SettingsScreen() {
         <SettingRow
           label="Graft Type"
           value={
-            profile.graftType === 'patellar'
-              ? 'Patellar Tendon'
-              : profile.graftType === 'hamstring'
-                ? 'Hamstring Tendon'
-                : 'Allograft'
+            profile.graftType === 'other'
+              ? profile.graftTypeCustom || 'Other'
+              : {
+                  patellar: 'Patellar Tendon',
+                  hamstring: 'Hamstring Tendon',
+                  quadriceps: 'Quadriceps Tendon',
+                  peroneus_longus: 'Peroneus Longus',
+                  allograft: 'Allograft',
+                }[profile.graftType] || profile.graftType
           }
           colors={colors}
         />

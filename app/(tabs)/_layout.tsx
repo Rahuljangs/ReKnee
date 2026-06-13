@@ -1,4 +1,5 @@
-import { Tabs, Redirect } from 'expo-router';
+import { useEffect } from 'react';
+import { Tabs, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useAppColors } from '@/src/utils/useAppColorScheme';
@@ -7,21 +8,23 @@ import { ActivityIndicator, View } from 'react-native';
 export default function TabLayout() {
   const { user, profile, loading, isNewUser } = useAuth();
   const colors = useAppColors();
+  const router = useRouter();
 
-  if (loading) {
+  useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      router.replace('/login');
+    } else if (isNewUser || !profile) {
+      router.replace('/onboarding');
+    }
+  }, [user, profile, loading, isNewUser, router]);
+
+  if (loading || !user || !profile) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
         <ActivityIndicator size="large" color={colors.tint} />
       </View>
     );
-  }
-
-  if (!user) {
-    return <Redirect href="/login" />;
-  }
-
-  if (isNewUser || !profile) {
-    return <Redirect href="/onboarding" />;
   }
 
   return (
@@ -42,10 +45,7 @@ export default function TabLayout() {
           elevation: 0,
         },
         headerTintColor: colors.text,
-        headerTitleStyle: {
-          fontWeight: '700',
-          fontSize: 17,
-        },
+        headerTitleStyle: { fontWeight: '700', fontSize: 17 },
       }}
     >
       <Tabs.Screen

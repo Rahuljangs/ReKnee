@@ -1,4 +1,10 @@
-export type GraftType = 'patellar' | 'hamstring' | 'allograft';
+export type GraftType =
+  | 'patellar'
+  | 'hamstring'
+  | 'quadriceps'
+  | 'peroneus_longus'
+  | 'allograft'
+  | 'other';
 
 export type RehabPhase = 1 | 2 | 3 | 4 | 5;
 
@@ -9,8 +15,10 @@ export type MessageRole = 'user' | 'assistant' | 'system';
 export interface UserProfile {
   uid: string;
   displayName: string;
+  email: string;
   surgeryDate: Date;
   graftType: GraftType;
+  graftTypeCustom?: string;
   currentPhase: RehabPhase;
   phaseUpdatedAt: Date;
   isPremium: boolean;

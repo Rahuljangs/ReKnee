@@ -18,20 +18,24 @@ import type { GraftType } from '@/src/types';
 import { calculateWeeksPostOp } from '@/src/services/ClinicalEngine';
 
 const GRAFT_OPTIONS: { value: GraftType; label: string; desc: string }[] = [
-  { value: 'patellar', label: 'Patellar Tendon', desc: 'Bone-patellar tendon-bone autograft' },
-  { value: 'hamstring', label: 'Hamstring Tendon', desc: 'Semitendinosus/gracilis autograft' },
-  { value: 'allograft', label: 'Allograft', desc: 'Donor tissue graft' },
+  { value: 'patellar', label: 'Patellar Tendon (BTB)', desc: 'Bone-patellar tendon-bone autograft — the gold standard' },
+  { value: 'hamstring', label: 'Hamstring Tendon', desc: 'Semitendinosus and/or gracilis autograft' },
+  { value: 'quadriceps', label: 'Quadriceps Tendon', desc: 'Quad tendon autograft — increasingly popular' },
+  { value: 'peroneus_longus', label: 'Peroneus Longus', desc: 'Peroneus longus tendon autograft from the ankle' },
+  { value: 'allograft', label: 'Allograft (Donor)', desc: 'Cadaver tissue graft — no donor site morbidity' },
+  { value: 'other', label: 'Other', desc: 'Specify your graft type below' },
 ];
 
 export default function OnboardingScreen() {
-  const { saveOnboardingProfile } = useAuth();
+  const { user, saveOnboardingProfile } = useAuth();
   const router = useRouter();
   const colors = useAppColors();
 
-  const [name, setName] = useState('');
+  const [name, setName] = useState(user?.displayName ?? '');
   const [surgeryDate, setSurgeryDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [graftType, setGraftType] = useState<GraftType | null>(null);
+  const [customGraft, setCustomGraft] = useState('');
   const [saving, setSaving] = useState(false);
 
   const weeksPostOp = calculateWeeksPostOp(surgeryDate);
@@ -51,6 +55,10 @@ export default function OnboardingScreen() {
       Alert.alert('Missing Info', 'Please select your graft type.');
       return;
     }
+    if (graftType === 'other' && !customGraft.trim()) {
+      Alert.alert('Missing Info', 'Please describe your graft type.');
+      return;
+    }
     if (surgeryDate > new Date()) {
       Alert.alert('Invalid Date', 'Surgery date cannot be in the future.');
       return;
@@ -58,7 +66,13 @@ export default function OnboardingScreen() {
 
     setSaving(true);
     try {
-      await saveOnboardingProfile(surgeryDate, graftType, initialPhase, name.trim());
+      await saveOnboardingProfile({
+        surgeryDate,
+        graftType,
+        graftTypeCustom: graftType === 'other' ? customGraft.trim() : undefined,
+        initialPhase,
+        name: name.trim(),
+      });
       router.replace('/(tabs)');
     } catch (error) {
       console.error('Onboarding error:', error);
@@ -81,13 +95,14 @@ export default function OnboardingScreen() {
         </Text>
       </View>
 
+      {/* Name */}
       <View style={[styles.card, { backgroundColor: colors.surface }]}>
         <Text style={[styles.label, { color: colors.text }]}>Your Name</Text>
         <Text style={[styles.helper, { color: colors.textSecondary }]}>
           What should we call you?
         </Text>
         <TextInput
-          style={[styles.nameInput, { backgroundColor: colors.inputBackground, color: colors.text }]}
+          style={[styles.textInputField, { backgroundColor: colors.inputBackground, color: colors.text }]}
           placeholder="Enter your name"
           placeholderTextColor={colors.textSecondary}
           value={name}
@@ -97,6 +112,7 @@ export default function OnboardingScreen() {
         />
       </View>
 
+      {/* Surgery Date */}
       <View style={[styles.card, { backgroundColor: colors.surface }]}>
         <Text style={[styles.label, { color: colors.text }]}>Surgery Date</Text>
         <Text style={[styles.helper, { color: colors.textSecondary }]}>
@@ -132,6 +148,7 @@ export default function OnboardingScreen() {
         </Text>
       </View>
 
+      {/* Graft Type */}
       <View style={[styles.card, { backgroundColor: colors.surface }]}>
         <Text style={[styles.label, { color: colors.text }]}>Graft Type</Text>
         <Text style={[styles.helper, { color: colors.textSecondary }]}>
@@ -159,6 +176,18 @@ export default function OnboardingScreen() {
             </View>
           </Pressable>
         ))}
+
+        {graftType === 'other' && (
+          <TextInput
+            style={[styles.textInputField, { backgroundColor: colors.inputBackground, color: colors.text, marginTop: 4 }]}
+            placeholder="e.g., LARS synthetic ligament, tibialis anterior..."
+            placeholderTextColor={colors.textSecondary}
+            value={customGraft}
+            onChangeText={setCustomGraft}
+            autoCapitalize="sentences"
+            maxLength={100}
+          />
+        )}
       </View>
 
       <Pressable
@@ -190,7 +219,7 @@ const styles = StyleSheet.create({
   },
   label: { fontSize: 18, fontWeight: '700', marginBottom: 4 },
   helper: { fontSize: 14, lineHeight: 20, marginBottom: 16 },
-  nameInput: {
+  textInputField: {
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
@@ -213,7 +242,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 2,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   radioOuter: {
     width: 22,

@@ -1,20 +1,24 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Platform, ActivityIndicator, Alert } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useAppColors } from '@/src/utils/useAppColorScheme';
 import Colors from '@/constants/Colors';
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
+  const router = useRouter();
   const colors = useAppColors();
   const [loading, setLoading] = useState(false);
 
   async function handleSignIn() {
+    if (loading) return;
     setLoading(true);
     try {
       await signIn();
+      router.replace('/onboarding');
     } catch (error: any) {
-      if (error?.code !== 'SIGN_IN_CANCELLED') {
+      if (error?.code !== 'SIGN_IN_CANCELLED' && error?.message !== 'SIGN_IN_CANCELLED') {
         Alert.alert('Sign In Failed', 'Please try again. Make sure you have an active internet connection.');
       }
     } finally {
@@ -80,9 +84,7 @@ const styles = StyleSheet.create({
     paddingTop: 120,
     paddingBottom: 60,
   },
-  hero: {
-    alignItems: 'center',
-  },
+  hero: { alignItems: 'center' },
   iconContainer: {
     width: 100,
     height: 100,
@@ -92,19 +94,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  iconEmoji: {
-    fontSize: 48,
-  },
-  appName: {
-    fontSize: 40,
-    fontWeight: '800',
-    letterSpacing: -1,
-  },
-  tagline: {
-    fontSize: 18,
-    fontWeight: '500',
-    marginTop: 4,
-  },
+  iconEmoji: { fontSize: 48 },
+  appName: { fontSize: 40, fontWeight: '800', letterSpacing: -1 },
+  tagline: { fontSize: 18, fontWeight: '500', marginTop: 4 },
   subtitle: {
     fontSize: 15,
     textAlign: 'center',
@@ -112,9 +104,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     paddingHorizontal: 16,
   },
-  bottom: {
-    alignItems: 'center',
-  },
+  bottom: { alignItems: 'center' },
   googleButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -132,17 +122,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },
-  googleIcon: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#4285F4',
-    marginRight: 12,
-  },
-  googleButtonText: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#1C1C1E',
-  },
+  googleIcon: { fontSize: 20, fontWeight: '700', color: '#4285F4', marginRight: 12 },
+  googleButtonText: { fontSize: 17, fontWeight: '600', color: '#1C1C1E' },
   startButton: {
     backgroundColor: Colors.brand.primary,
     borderRadius: 14,
@@ -150,17 +131,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     width: '100%',
     alignItems: 'center',
-    shadowColor: Colors.brand.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
   },
-  startButtonText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
+  startButtonText: { fontSize: 18, fontWeight: '700', color: '#FFFFFF' },
   disclaimer: {
     fontSize: 12,
     textAlign: 'center',
