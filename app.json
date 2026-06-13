@@ -70,11 +70,13 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "YOUR_EAS_PROJECT_ID"
-      }
+        "projectId": "6eaa6882-3860-4831-9bab-b6aba213d7f6"
+      },
+      "router": {}
     },
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "owner": "rjangs"
   }
 }

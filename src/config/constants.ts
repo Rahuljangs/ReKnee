@@ -9,8 +9,8 @@ export const GEMINI_MODEL = 'gemini-2.5-flash-lite';
 export const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 export const CLOUD_FUNCTION_BASE_URL = __DEV__
-  ? 'http://10.0.2.2:5001/YOUR_FIREBASE_PROJECT/us-central1'
-  : 'https://us-central1-YOUR_FIREBASE_PROJECT.cloudfunctions.net';
+  ? 'http://10.0.2.2:5001/reknee-e7381/us-central1'
+  : 'https://us-central1-reknee-e7381.cloudfunctions.net';
 
 export const PHASE_NAMES: Record<number, string> = {
   1: 'Protection & Early Motion',

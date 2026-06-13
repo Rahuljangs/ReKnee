@@ -1,8 +1,8 @@
 import { Platform } from 'react-native';
 import Purchases, { LOG_LEVEL } from 'react-native-purchases';
 
-const REVENUECAT_API_KEY_ANDROID = 'YOUR_REVENUECAT_ANDROID_API_KEY';
-const REVENUECAT_API_KEY_IOS = 'YOUR_REVENUECAT_IOS_API_KEY';
+const REVENUECAT_API_KEY_ANDROID = 'test_SOynKQmlfLekfDxKBHDjKyjIKHp';
+const REVENUECAT_API_KEY_IOS = 'test_SOynKQmlfLekfDxKBHDjKyjIKHp';
 
 let isConfigured = false;
 
