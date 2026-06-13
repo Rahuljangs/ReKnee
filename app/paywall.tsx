@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useAppColors } from '@/src/utils/useAppColorScheme';
 import Colors from '@/constants/Colors';
-import { DEV_MODE } from '@/src/config/constants';
 
 const PREMIUM_FEATURES = [
   {
@@ -36,13 +35,6 @@ export default function PaywallScreen() {
   const [purchasing, setPurchasing] = useState(false);
 
   async function handlePurchase() {
-    if (DEV_MODE) {
-      Alert.alert('Dev Mode', 'Premium unlocked (dev mode — RevenueCat skipped).', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
-      return;
-    }
-
     setPurchasing(true);
     try {
       const Purchases = require('react-native-purchases').default;

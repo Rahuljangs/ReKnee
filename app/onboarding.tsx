@@ -7,6 +7,7 @@ import {
   Platform,
   ScrollView,
   Alert,
+  TextInput,
 } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
@@ -23,10 +24,11 @@ const GRAFT_OPTIONS: { value: GraftType; label: string; desc: string }[] = [
 ];
 
 export default function OnboardingScreen() {
-  const { user, saveOnboardingProfile } = useAuth();
+  const { saveOnboardingProfile } = useAuth();
   const router = useRouter();
   const colors = useAppColors();
 
+  const [name, setName] = useState('');
   const [surgeryDate, setSurgeryDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [graftType, setGraftType] = useState<GraftType | null>(null);
@@ -41,6 +43,10 @@ export default function OnboardingScreen() {
   }
 
   async function handleComplete() {
+    if (!name.trim()) {
+      Alert.alert('Missing Info', 'Please enter your name.');
+      return;
+    }
     if (!graftType) {
       Alert.alert('Missing Info', 'Please select your graft type.');
       return;
@@ -73,6 +79,22 @@ export default function OnboardingScreen() {
           Let's set up your recovery profile. We need a couple of details to
           personalize your rehabilitation journey.
         </Text>
+      </View>
+
+      <View style={[styles.card, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.label, { color: colors.text }]}>Your Name</Text>
+        <Text style={[styles.helper, { color: colors.textSecondary }]}>
+          What should we call you?
+        </Text>
+        <TextInput
+          style={[styles.nameInput, { backgroundColor: colors.inputBackground, color: colors.text }]}
+          placeholder="Enter your name"
+          placeholderTextColor={colors.textSecondary}
+          value={name}
+          onChangeText={setName}
+          autoCapitalize="words"
+          maxLength={50}
+        />
       </View>
 
       <View style={[styles.card, { backgroundColor: colors.surface }]}>
@@ -165,14 +187,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   label: { fontSize: 18, fontWeight: '700', marginBottom: 4 },
   helper: { fontSize: 14, lineHeight: 20, marginBottom: 16 },
+  nameInput: {
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+  },
   dateButton: {
     borderRadius: 12,
     padding: 16,

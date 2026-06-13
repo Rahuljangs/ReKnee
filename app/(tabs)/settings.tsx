@@ -86,7 +86,7 @@ export default function SettingsScreen() {
           ABOUT
         </Text>
         <SettingRow label="App Version" value={APP_VERSION} colors={colors} />
-        <SettingRow label="LLM Provider" value="Gemini 3.1 Flash-Lite" colors={colors} />
+        <SettingRow label="AI Model" value="Llama 3.3 70B" colors={colors} />
       </View>
 
       <Pressable

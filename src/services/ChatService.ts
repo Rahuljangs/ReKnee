@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { checkForDVTRedFlags, DVT_EMERGENCY_MESSAGE } from './DVTTriageService';
 import { callGeminiDirectly } from './LocalGeminiService';
 import { calculateDaysPostOp, calculateWeeksPostOp } from './ClinicalEngine';
-import { DEV_MODE, CLOUD_FUNCTION_BASE_URL } from '@/src/config/constants';
+import { CLOUD_FUNCTION_BASE_URL } from '@/src/config/constants';
 import type { ChatMessage, UserProfile, DailyLog, GeminiExtractedData, DVTCheckResult } from '@/src/types';
 
 const MESSAGES_KEY = '@reknee_messages';
@@ -94,11 +94,7 @@ export async function sendMessage(
     return { message: DVT_EMERGENCY_MESSAGE, dvtAlert: dvtCheck };
   }
 
-  if (DEV_MODE) {
-    return sendMessageLocal(userMessage, profile, dvtCheck);
-  } else {
-    return sendMessageRemote(userMessage, profile, dvtCheck);
-  }
+  return sendMessageLocal(userMessage, profile, dvtCheck);
 }
 
 async function sendMessageLocal(
@@ -163,95 +159,11 @@ async function sendMessageLocal(
   }
 }
 
-async function sendMessageRemote(
-  userMessage: string,
-  profile: UserProfile,
-  dvtCheck: DVTCheckResult
-): Promise<ChatResponse> {
-  try {
-    const response = await fetch(`${CLOUD_FUNCTION_BASE_URL}/onChatMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid: profile.uid, message: userMessage }),
-    });
-
-    if (!response.ok) throw new Error(`Server error: ${response.status}`);
-    const data = await response.json();
-
-    const aiMsg: ChatMessage = {
-      id: `ai_${Date.now()}`,
-      role: 'assistant',
-      content: data.conversationalResponse,
-      extractedSymptoms: data.extractedSymptoms ?? [],
-      dvtFlag: false,
-      createdAt: new Date(),
-    };
-    await appendMessage(aiMsg);
-
-    return { message: data.conversationalResponse, dvtAlert: dvtCheck, extractedData: data };
-  } catch (error) {
-    console.error('Remote chat error:', error);
-    const fallback = "I'm having trouble connecting right now. Please try again.";
-    return { message: fallback, dvtAlert: dvtCheck };
-  }
-}
-
 export async function loadMessageHistory(_uid: string, _limitCount = 50): Promise<ChatMessage[]> {
-  if (DEV_MODE) {
-    return getStoredMessages();
-  }
-
-  const firestore = require('@react-native-firebase/firestore').default;
-  const snapshot = await firestore()
-    .collection('users')
-    .doc(_uid)
-    .collection('messages')
-    .orderBy('createdAt', 'desc')
-    .limit(_limitCount)
-    .get();
-
-  return snapshot.docs
-    .map((doc: any) => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        role: data.role,
-        content: data.content,
-        extractedSymptoms: data.extractedSymptoms,
-        dvtFlag: data.dvtFlag,
-        createdAt: data.createdAt?.toDate() ?? new Date(),
-      } as ChatMessage;
-    })
-    .reverse();
+  return getStoredMessages();
 }
 
 export async function loadRecentDailyLogs(_uid: string, count = 7): Promise<DailyLog[]> {
-  if (DEV_MODE) {
-    const logs = await getStoredLogs();
-    return logs.slice(-count);
-  }
-
-  const firestore = require('@react-native-firebase/firestore').default;
-  const snapshot = await firestore()
-    .collection('users')
-    .doc(_uid)
-    .collection('daily_logs')
-    .orderBy('createdAt', 'desc')
-    .limit(count)
-    .get();
-
-  return snapshot.docs
-    .map((doc: any) => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        reportedSymptoms: data.reportedSymptoms ?? [],
-        completedExercises: data.completedExercises ?? [],
-        painLevel: data.painLevel ?? 0,
-        swellingLevel: data.swellingLevel ?? 'none',
-        llmSummary: data.llmSummary ?? '',
-        createdAt: data.createdAt?.toDate() ?? new Date(),
-      } as DailyLog;
-    })
-    .reverse();
+  const logs = await getStoredLogs();
+  return logs.slice(-count);
 }

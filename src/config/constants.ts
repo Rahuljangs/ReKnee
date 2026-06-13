@@ -1,9 +1,3 @@
-/**
- * Set to true to run without Firebase/RevenueCat (works in Expo Go).
- * Set to false for production builds with full Firebase backend.
- */
-export const DEV_MODE = true;
-
 export const LLM_API_KEY = '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';
 export const LLM_MODEL = 'meta/llama-3.3-70b-instruct';
 export const LLM_API_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
