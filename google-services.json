@@ -12,7 +12,20 @@
           "package_name": "com.reknee.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "271119981552-a02ut5t6bc2fmtndq3115cibsjpt64nu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.reknee.app",
+            "certificate_hash": "f1b0765de7a7c92f6f4db2f4ce0e3c2d8d023dd9"
+          }
+        },
+        {
+          "client_id": "271119981552-kdbaao7g4ljhvuc19kb27rn8l1c9rmjq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAavg50VWq1JtAgF914eL3C--xfh8ZkhUI"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "271119981552-kdbaao7g4ljhvuc19kb27rn8l1c9rmjq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import type { UserProfile, GraftType } from '@/src/types';
 
 interface AuthState {
@@ -13,7 +14,7 @@ interface AuthContextValue extends AuthState {
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
-  saveOnboardingProfile: (surgeryDate: Date, graftType: GraftType, initialPhase: number) => Promise<void>;
+  saveOnboardingProfile: (surgeryDate: Date, graftType: GraftType, initialPhase: number, name: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -38,32 +39,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
-    loadStoredState();
+    if (Platform.OS === 'web') {
+      loadFromStorage();
+    } else {
+      initNativeAuth();
+    }
   }, []);
 
-  async function loadStoredState() {
+  async function loadFromStorage() {
     try {
       const [userJson, profileJson] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.USER),
         AsyncStorage.getItem(STORAGE_KEYS.PROFILE),
       ]);
-
       if (userJson) {
         const user = JSON.parse(userJson);
-        const profile = profileJson ? JSON.parse(profileJson) : null;
-
-        if (profile) {
-          profile.surgeryDate = new Date(profile.surgeryDate);
-          profile.phaseUpdatedAt = new Date(profile.phaseUpdatedAt);
-          profile.createdAt = new Date(profile.createdAt);
-        }
-
-        setState({
-          user,
-          profile,
-          loading: false,
-          isNewUser: !profile,
-        });
+        const profile = profileJson ? deserializeProfile(JSON.parse(profileJson)) : null;
+        setState({ user, profile, loading: false, isNewUser: !profile });
       } else {
         setState({ user: null, profile: null, loading: false, isNewUser: false });
       }
@@ -72,36 +64,85 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  async function initNativeAuth() {
+    try {
+      const auth = require('@react-native-firebase/auth').default;
+      const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+
+      GoogleSignin.configure({
+        webClientId: '271119981552-kdbaao7g4ljhvuc19kb27rn8l1c9rmjq.apps.googleusercontent.com',
+      });
+
+      auth().onAuthStateChanged(async (firebaseUser: any) => {
+        if (firebaseUser) {
+          const user = {
+            uid: firebaseUser.uid,
+            displayName: firebaseUser.displayName ?? '',
+            email: firebaseUser.email ?? '',
+          };
+          await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+
+          const profileJson = await AsyncStorage.getItem(STORAGE_KEYS.PROFILE);
+          const profile = profileJson ? deserializeProfile(JSON.parse(profileJson)) : null;
+          setState({ user, profile, loading: false, isNewUser: !profile });
+        } else {
+          setState({ user: null, profile: null, loading: false, isNewUser: false });
+        }
+      });
+    } catch (error) {
+      console.error('Native auth init error:', error);
+      loadFromStorage();
+    }
+  }
+
   async function signIn() {
-    const user = {
-      uid: 'user_' + Date.now().toString(36),
-      displayName: '',
-      email: '',
-    };
+    if (Platform.OS === 'web') {
+      const user = { uid: 'web_user_' + Date.now().toString(36), displayName: '', email: '' };
+      await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+      const profileJson = await AsyncStorage.getItem(STORAGE_KEYS.PROFILE);
+      const profile = profileJson ? deserializeProfile(JSON.parse(profileJson)) : null;
+      setState({ user, profile, loading: false, isNewUser: !profile });
+      return;
+    }
 
-    await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+    try {
+      const auth = require('@react-native-firebase/auth').default;
+      const { GoogleSignin } = require('@react-native-google-signin/google-signin');
 
-    const existingProfile = await AsyncStorage.getItem(STORAGE_KEYS.PROFILE);
-    if (existingProfile) {
-      const profile = JSON.parse(existingProfile);
-      profile.surgeryDate = new Date(profile.surgeryDate);
-      profile.phaseUpdatedAt = new Date(profile.phaseUpdatedAt);
-      profile.createdAt = new Date(profile.createdAt);
-      setState({ user, profile, loading: false, isNewUser: false });
-    } else {
-      setState({ user, profile: null, loading: false, isNewUser: true });
+      await GoogleSignin.hasPlayServices();
+      const response = await GoogleSignin.signIn();
+      const idToken = response.data?.idToken;
+      if (!idToken) throw new Error('No ID token received');
+      const credential = auth.GoogleAuthProvider.credential(idToken);
+      await auth().signInWithCredential(credential);
+    } catch (error) {
+      console.error('Google Sign-In error:', error);
+      throw error;
     }
   }
 
   async function signOut() {
-    await AsyncStorage.multiRemove([STORAGE_KEYS.USER, STORAGE_KEYS.PROFILE, '@reknee_messages', '@reknee_daily_logs', '@reknee_completed_exercises']);
+    await AsyncStorage.multiRemove([
+      STORAGE_KEYS.USER, STORAGE_KEYS.PROFILE,
+      '@reknee_messages', '@reknee_daily_logs', '@reknee_completed_exercises',
+    ]);
+
+    if (Platform.OS !== 'web') {
+      try {
+        const auth = require('@react-native-firebase/auth').default;
+        const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+        try { await GoogleSignin.revokeAccess(); } catch {}
+        await auth().signOut();
+      } catch {}
+    }
+
     setState({ user: null, profile: null, loading: false, isNewUser: false });
   }
 
-  async function saveOnboardingProfile(surgeryDate: Date, graftType: GraftType, initialPhase: number) {
+  async function saveOnboardingProfile(surgeryDate: Date, graftType: GraftType, initialPhase: number, name: string) {
     const profile: UserProfile = {
       uid: state.user!.uid,
-      displayName: state.user!.displayName,
+      displayName: name || state.user!.displayName || '',
       surgeryDate,
       graftType,
       currentPhase: initialPhase as UserProfile['currentPhase'],
@@ -118,10 +159,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function refreshProfile() {
     const profileJson = await AsyncStorage.getItem(STORAGE_KEYS.PROFILE);
     if (profileJson) {
-      const profile = JSON.parse(profileJson);
-      profile.surgeryDate = new Date(profile.surgeryDate);
-      profile.phaseUpdatedAt = new Date(profile.phaseUpdatedAt);
-      profile.createdAt = new Date(profile.createdAt);
+      const profile = deserializeProfile(JSON.parse(profileJson));
       setState((prev) => ({ ...prev, profile, isNewUser: false }));
     }
   }
@@ -133,4 +171,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
+}
+
+function deserializeProfile(data: any): UserProfile {
+  return {
+    ...data,
+    surgeryDate: new Date(data.surgeryDate),
+    phaseUpdatedAt: new Date(data.phaseUpdatedAt),
+    createdAt: new Date(data.createdAt),
+  };
 }

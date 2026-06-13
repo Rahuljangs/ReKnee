@@ -58,7 +58,7 @@ export default function OnboardingScreen() {
 
     setSaving(true);
     try {
-      await saveOnboardingProfile(surgeryDate, graftType, initialPhase);
+      await saveOnboardingProfile(surgeryDate, graftType, initialPhase, name.trim());
       router.replace('/(tabs)');
     } catch (error) {
       console.error('Onboarding error:', error);
