@@ -34,8 +34,7 @@ yarn-error.*
 .env
 .env*.local
 
-# Firebase credentials (NEVER commit)
-google-services.json
+# Firebase (google-services.json is safe to commit — it's public config)
 GoogleService-Info.plist
 play-store-service-account.json
 firebase-debug.log

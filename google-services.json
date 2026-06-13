@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "271119981552",
+    "project_id": "reknee-e7381",
+    "storage_bucket": "reknee-e7381.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:271119981552:android:154d5771a404d909e35b35",
+        "android_client_info": {
+          "package_name": "com.reknee.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAavg50VWq1JtAgF914eL3C--xfh8ZkhUI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
