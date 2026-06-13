@@ -155,7 +155,7 @@ function ProdAuthProvider({ children }: { children: React.ReactNode }) {
       const firestore = require('@react-native-firebase/firestore').default;
 
       GoogleSignin.configure({
-        webClientId: 'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com',
+        webClientId: '271119981552-kdbaao7g4ljhvuc19kb27rn8l1c9rmjq.apps.googleusercontent.com',
       });
 
       unsubscribe = auth().onAuthStateChanged(async (firebaseUser: any) => {
