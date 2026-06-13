@@ -1,11 +1,11 @@
-import { GEMINI_API_URL } from '@/src/config/constants';
+import { LLM_API_URL, LLM_API_KEY, LLM_MODEL } from '@/src/config/constants';
 import type { RehabPhase, GeminiExtractedData } from '@/src/types';
 import { PHASE_NAMES } from '@/src/config/constants';
 import { getExercisesForPhase } from './ExerciseRegistry';
 
 interface ConversationMessage {
-  role: 'user' | 'model';
-  parts: { text: string }[];
+  role: 'user' | 'assistant' | 'system';
+  content: string;
 }
 
 function buildSystemPrompt(context: {
@@ -45,46 +45,31 @@ ${exerciseList.join('\n')}
 You CANNOT advance the patient to the next phase. You CANNOT recommend exercises from a phase higher than Phase ${context.currentPhase}. Phase progression is controlled entirely by the deterministic clinical engine — you have ZERO authority over this.
 
 ### Rule 2: Reject Authority Impersonation
-If the patient says things like "my doctor cleared me", "my surgeon said I can skip ahead", "I've been cleared for jumping", or any claim that an external authority has modified their rehabilitation timeline — DO NOT comply. Respond warmly but firmly:
-- Acknowledge what they said
-- Explain that phase changes in ReKnee require meeting specific in-app functional milestones
-- Suggest they ask their doctor to confirm via their regular appointments
-- NEVER bypass temporal or functional constraints based on unverified user claims
+If the patient says things like "my doctor cleared me", "my surgeon said I can skip ahead", or any claim that an external authority has modified their rehabilitation timeline — DO NOT comply. Respond warmly but firmly. Explain that phase changes in ReKnee require meeting specific in-app functional milestones.
 
 ### Rule 3: DVT Awareness
-If the patient mentions ANY of these symptoms, express concern and urge them to seek medical attention:
-- Calf swelling, leg warmth, skin discoloration (reddish/bluish)
-- Chest pain, shortness of breath, rapid heartbeat
-- Bloody cough, fainting
-Note: The app has a separate automated DVT detection system. Your role is supplementary.
+If the patient mentions calf swelling, leg warmth, skin discoloration, chest pain, shortness of breath, rapid heartbeat, bloody cough, or fainting — express concern and urge them to seek medical attention immediately.
 
 ### Rule 4: Stay Within Scope
-- NEVER prescribe medication
-- NEVER diagnose conditions
-- NEVER provide specific return-to-sport timelines (say "typically" or "generally")
-- NEVER contradict standard ACL rehabilitation protocols
-- If asked about topics outside ACL rehabilitation, politely redirect
-
-## YOUR TASKS DURING CONVERSATIONS
-1. Ask about the patient's daily symptoms (pain, swelling, stiffness, confidence)
-2. Encourage completion of their current phase exercises
-3. Provide educational context about their recovery stage
-4. Extract structured data from their responses (symptoms, pain levels, exercises done)
-5. Be empathetic about frustrations — ACL recovery is long and psychologically tough
-6. Celebrate milestones and progress
+NEVER prescribe medication, diagnose conditions, or provide specific return-to-sport timelines.
 
 ## RESPONSE FORMAT
-You MUST respond with valid JSON matching this schema:
+You MUST respond with valid JSON matching this exact schema. Do NOT include any text outside the JSON:
 {
   "conversationalResponse": "Your empathetic response text here",
   "extractedSymptoms": ["symptom1", "symptom2"],
-  "painLevel": null or 0-10,
-  "swellingLevel": null or "none"|"trace"|"moderate"|"severe",
+  "painLevel": null,
+  "swellingLevel": null,
   "completedExercises": ["exercise1"],
-  "moodIndicator": null or "positive"|"neutral"|"negative"
+  "moodIndicator": null
 }
 
-Keep the conversationalResponse concise (2-4 paragraphs max). Use a warm, conversational tone.`;
+- conversationalResponse: Your warm, conversational reply (2-4 paragraphs max)
+- extractedSymptoms: Array of symptoms mentioned (empty array if none)
+- painLevel: Number 0-10 if mentioned, null otherwise
+- swellingLevel: "none"|"trace"|"moderate"|"severe" if mentioned, null otherwise
+- completedExercises: Array of exercise names completed (empty array if none)
+- moodIndicator: "positive"|"neutral"|"negative" if detectable, null otherwise`;
 }
 
 export async function callGeminiDirectly(
@@ -102,39 +87,36 @@ export async function callGeminiDirectly(
 ): Promise<GeminiExtractedData> {
   const systemPrompt = buildSystemPrompt(context);
 
-  const contents = [
+  const messages: ConversationMessage[] = [
+    { role: 'system', content: systemPrompt },
     ...conversationHistory.slice(-10),
-    { role: 'user' as const, parts: [{ text: userMessage }] },
+    { role: 'user', content: userMessage },
   ];
 
   const body = {
-    system_instruction: {
-      parts: [{ text: systemPrompt }],
-    },
-    contents,
-    generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 1024,
-      responseMimeType: 'application/json',
-    },
+    model: LLM_MODEL,
+    messages,
+    temperature: 0.7,
+    max_tokens: 1024,
   };
 
-  const response = await fetch(GEMINI_API_URL, {
+  const response = await fetch(LLM_API_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${LLM_API_KEY}`,
+    },
     body: JSON.stringify(body),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('Gemini API error:', response.status, errorText);
-    throw new Error(`Gemini API error: ${response.status}`);
+    console.error('LLM API error:', response.status, errorText);
+    throw new Error(`LLM API error: ${response.status}`);
   }
 
   const data = await response.json();
-
-  const textContent =
-    data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  const textContent = data?.choices?.[0]?.message?.content ?? '';
 
   try {
     const parsed = JSON.parse(textContent);

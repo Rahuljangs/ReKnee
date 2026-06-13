@@ -2,14 +2,16 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { defineSecret } from 'firebase-functions/params';
 import * as admin from 'firebase-admin';
-import { GoogleGenAI, Type } from '@google/genai';
 import { buildSystemPrompt } from './systemPrompt';
 import { checkDVTServerSide, DVT_EMERGENCY_RESPONSE } from './dvtCheck';
 
 admin.initializeApp();
 const db = admin.firestore();
 
-const geminiApiKey = defineSecret('GEMINI_API_KEY');
+const llmApiKey = defineSecret('LLM_API_KEY');
+
+const LLM_API_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
+const LLM_MODEL = 'meta/llama-3.3-70b-instruct';
 
 const PHASE_NAMES: Record<number, string> = {
   1: 'Protection & Early Motion',
@@ -59,55 +61,8 @@ const PHASE_EXERCISES: Record<number, string[]> = {
   ],
 };
 
-const extractionSchema = {
-  type: Type.OBJECT,
-  properties: {
-    conversationalResponse: {
-      type: Type.STRING,
-      description: 'Your empathetic conversational response to the patient',
-    },
-    extractedSymptoms: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING },
-      description:
-        'List of symptoms mentioned by the patient (e.g., "knee stiffness", "mild swelling", "sharp pain during squats")',
-    },
-    painLevel: {
-      type: Type.NUMBER,
-      description:
-        'Patient pain level on 0-10 scale extracted from message, or null if not mentioned',
-      nullable: true,
-    },
-    swellingLevel: {
-      type: Type.STRING,
-      description:
-        'Swelling level extracted: "none", "trace", "moderate", or "severe". null if not mentioned',
-      nullable: true,
-      enum: ['none', 'trace', 'moderate', 'severe'],
-    },
-    completedExercises: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING },
-      description:
-        'List of exercises the patient mentioned completing today',
-    },
-    moodIndicator: {
-      type: Type.STRING,
-      description:
-        'Overall emotional tone: "positive", "neutral", or "negative". null if unclear',
-      nullable: true,
-      enum: ['positive', 'neutral', 'negative'],
-    },
-  },
-  required: [
-    'conversationalResponse',
-    'extractedSymptoms',
-    'completedExercises',
-  ],
-};
-
 export const onChatMessage = onRequest(
-  { secrets: [geminiApiKey], cors: true, region: 'us-central1' },
+  { secrets: [llmApiKey], cors: true, region: 'us-central1' },
   async (req, res) => {
     if (req.method !== 'POST') {
       res.status(405).json({ error: 'Method not allowed' });
@@ -122,7 +77,6 @@ export const onChatMessage = onRequest(
     }
 
     try {
-      // 1. Server-side DVT check (authoritative — cannot be bypassed)
       const dvtResult = checkDVTServerSide(message);
       if (dvtResult.severity === 'critical') {
         await db.collection('users').doc(uid).collection('dvt_alerts').add({
@@ -140,7 +94,6 @@ export const onChatMessage = onRequest(
         return;
       }
 
-      // 2. Fetch user profile
       const userDoc = await db.collection('users').doc(uid).get();
       if (!userDoc.exists) {
         res.status(404).json({ error: 'User not found' });
@@ -157,14 +110,9 @@ export const onChatMessage = onRequest(
       const weeksPostOp = daysPostOp / 7;
       const currentPhase = userData.currentPhase as number;
 
-      // 3. Load recent daily logs for context
       const logsSnap = await db
-        .collection('users')
-        .doc(uid)
-        .collection('daily_logs')
-        .orderBy('createdAt', 'desc')
-        .limit(5)
-        .get();
+        .collection('users').doc(uid).collection('daily_logs')
+        .orderBy('createdAt', 'desc').limit(5).get();
 
       const recentSymptoms: string[] = [];
       const recentPainLevels: number[] = [];
@@ -175,26 +123,20 @@ export const onChatMessage = onRequest(
         if (data.painLevel != null) recentPainLevels.push(data.painLevel);
       });
 
-      // 4. Load last 10 messages for conversation context
       const messagesSnap = await db
-        .collection('users')
-        .doc(uid)
-        .collection('messages')
-        .orderBy('createdAt', 'desc')
-        .limit(10)
-        .get();
+        .collection('users').doc(uid).collection('messages')
+        .orderBy('createdAt', 'desc').limit(10).get();
 
       const conversationHistory = messagesSnap.docs
         .map((doc) => {
           const data = doc.data();
           return {
-            role: data.role === 'user' ? 'user' as const : 'model' as const,
-            parts: [{ text: data.content }],
+            role: data.role === 'user' ? 'user' as const : 'assistant' as const,
+            content: data.content,
           };
         })
         .reverse();
 
-      // 5. Build system prompt
       const systemPrompt = buildSystemPrompt({
         userName: userData.displayName || 'there',
         currentPhase,
@@ -207,27 +149,32 @@ export const onChatMessage = onRequest(
         recentPainLevels: recentPainLevels.slice(0, 5),
       });
 
-      // 6. Call Gemini 3.1 Flash-Lite
-      const ai = new GoogleGenAI({ apiKey: geminiApiKey.value() });
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.1-flash-lite',
-        contents: [
-          ...conversationHistory,
-          { role: 'user', parts: [{ text: message }] },
-        ],
-        config: {
-          systemInstruction: systemPrompt,
-          responseMimeType: 'application/json',
-          responseSchema: extractionSchema,
-          temperature: 0.7,
-          maxOutputTokens: 1024,
+      const llmResponse = await fetch(LLM_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${llmApiKey.value()}`,
         },
+        body: JSON.stringify({
+          model: LLM_MODEL,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...conversationHistory,
+            { role: 'user', content: message },
+          ],
+          temperature: 0.7,
+          max_tokens: 1024,
+        }),
       });
 
-      const responseText = response.text ?? '';
-      let parsed;
+      if (!llmResponse.ok) {
+        throw new Error(`LLM API error: ${llmResponse.status}`);
+      }
 
+      const llmData = await llmResponse.json();
+      const responseText = llmData?.choices?.[0]?.message?.content ?? '';
+
+      let parsed;
       try {
         parsed = JSON.parse(responseText);
       } catch {
@@ -241,32 +188,22 @@ export const onChatMessage = onRequest(
         };
       }
 
-      // 7. Update daily log if symptoms/exercises extracted
       if (
         parsed.extractedSymptoms?.length ||
         parsed.painLevel != null ||
         parsed.completedExercises?.length
       ) {
         const today = new Date().toISOString().split('T')[0];
-        const logRef = db
-          .collection('users')
-          .doc(uid)
-          .collection('daily_logs')
-          .doc(today);
-
+        const logRef = db.collection('users').doc(uid).collection('daily_logs').doc(today);
         const existingLog = await logRef.get();
 
         if (existingLog.exists) {
           const updateData: Record<string, any> = {};
           if (parsed.extractedSymptoms?.length) {
-            updateData.reportedSymptoms = admin.firestore.FieldValue.arrayUnion(
-              ...parsed.extractedSymptoms
-            );
+            updateData.reportedSymptoms = admin.firestore.FieldValue.arrayUnion(...parsed.extractedSymptoms);
           }
           if (parsed.completedExercises?.length) {
-            updateData.completedExercises = admin.firestore.FieldValue.arrayUnion(
-              ...parsed.completedExercises
-            );
+            updateData.completedExercises = admin.firestore.FieldValue.arrayUnion(...parsed.completedExercises);
           }
           if (parsed.painLevel != null) updateData.painLevel = parsed.painLevel;
           if (parsed.swellingLevel) updateData.swellingLevel = parsed.swellingLevel;
@@ -282,15 +219,6 @@ export const onChatMessage = onRequest(
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
           });
         }
-      }
-
-      // 8. Check if phase advancement is warranted
-      const timeEligiblePhase =
-        weeksPostOp < 2 ? 1 : weeksPostOp < 6 ? 2 : weeksPostOp < 16 ? 3 : weeksPostOp < 24 ? 4 : 5;
-
-      if (timeEligiblePhase > currentPhase && currentPhase < 5) {
-        // Time criteria met — check functional criteria on next daily check-in
-        // Phase advancement is NOT automatic; it's evaluated separately
       }
 
       res.json({
@@ -336,7 +264,6 @@ export const scheduledDailyCheckIn = onSchedule(
 
     if (messages.length === 0) return;
 
-    // Send via Expo Push API
     const chunks = [];
     for (let i = 0; i < messages.length; i += 100) {
       chunks.push(messages.slice(i, i + 100));
@@ -346,10 +273,7 @@ export const scheduledDailyCheckIn = onSchedule(
       try {
         await fetch('https://exp.host/--/api/v2/push/send', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify(chunk),
         });
       } catch (error) {

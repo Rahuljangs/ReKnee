@@ -112,11 +112,10 @@ async function sendMessageLocal(
       .filter((m) => m.role === 'user' || m.role === 'assistant')
       .slice(-10)
       .map((m) => ({
-        role: (m.role === 'user' ? 'user' : 'model') as 'user' | 'model',
-        parts: [{ text: m.content }],
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
       }));
 
-    // Remove the last entry (the message we just added) since we pass it separately
     if (conversationHistory.length > 0 && conversationHistory[conversationHistory.length - 1].role === 'user') {
       conversationHistory.pop();
     }

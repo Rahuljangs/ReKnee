@@ -4,9 +4,9 @@
  */
 export const DEV_MODE = true;
 
-export const GEMINI_API_KEY = 'AIzaSyBWOChOhQ9hssZnkEH0NWqXf4PullXY5Ko';
-export const GEMINI_MODEL = 'gemini-2.5-flash-lite';
-export const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+export const LLM_API_KEY = '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';
+export const LLM_MODEL = 'meta/llama-3.3-70b-instruct';
+export const LLM_API_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
 
 export const CLOUD_FUNCTION_BASE_URL = __DEV__
   ? 'http://10.0.2.2:5001/reknee-e7381/us-central1'
