@@ -79,6 +79,23 @@ export default function SettingsScreen() {
           colors={colors}
         />
         <SettingRow
+          label="Age"
+          value={profile.age ? `${profile.age} years` : 'Not set'}
+          colors={colors}
+        />
+        <SettingRow
+          label="Meniscus"
+          value={
+            {
+              none: 'No meniscus procedure',
+              repair: 'Meniscus Repair',
+              meniscectomy: 'Meniscectomy (trim)',
+              unknown: 'Not specified',
+            }[profile.meniscusStatus] || 'Not set'
+          }
+          colors={colors}
+        />
+        <SettingRow
           label="Subscription"
           value={profile.isPremium ? 'Premium' : 'Free'}
           colors={colors}

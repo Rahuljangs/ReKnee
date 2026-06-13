@@ -3,7 +3,7 @@ import { checkForDVTRedFlags, DVT_EMERGENCY_MESSAGE } from './DVTTriageService';
 import { callGeminiDirectly } from './LocalGeminiService';
 import { calculateDaysPostOp, calculateWeeksPostOp } from './ClinicalEngine';
 import { CLOUD_FUNCTION_BASE_URL } from '@/src/config/constants';
-import type { ChatMessage, UserProfile, DailyLog, GeminiExtractedData, DVTCheckResult } from '@/src/types';
+import type { ChatMessage, UserProfile, DailyLog, LLMExtractedData, DVTCheckResult } from '@/src/types';
 
 const MESSAGES_KEY = '@reknee_messages';
 const LOGS_KEY = '@reknee_daily_logs';
@@ -11,7 +11,7 @@ const LOGS_KEY = '@reknee_daily_logs';
 export interface ChatResponse {
   message: string;
   dvtAlert: DVTCheckResult;
-  extractedData?: GeminiExtractedData;
+  extractedData?: LLMExtractedData;
 }
 
 async function getStoredMessages(): Promise<ChatMessage[]> {
@@ -48,6 +48,7 @@ async function upsertDailyLog(data: Partial<DailyLog>): Promise<void> {
       completedExercises: [...new Set([...existing.completedExercises, ...(data.completedExercises ?? [])])],
       painLevel: data.painLevel ?? existing.painLevel,
       swellingLevel: data.swellingLevel ?? existing.swellingLevel,
+      sleepQuality: data.sleepQuality ?? existing.sleepQuality,
       llmSummary: data.llmSummary ?? existing.llmSummary,
     };
   } else {
@@ -57,6 +58,7 @@ async function upsertDailyLog(data: Partial<DailyLog>): Promise<void> {
       completedExercises: data.completedExercises ?? [],
       painLevel: data.painLevel ?? 0,
       swellingLevel: data.swellingLevel ?? 'none',
+      sleepQuality: data.sleepQuality ?? 0,
       llmSummary: data.llmSummary ?? '',
       createdAt: new Date(),
     });
@@ -120,14 +122,20 @@ async function sendMessageLocal(
     const recentSymptoms = logs.flatMap((l) => l.reportedSymptoms).slice(-10);
     const recentPainLevels = logs.map((l) => l.painLevel).filter((p) => p > 0).slice(-5);
 
+    const recentSleepScores = logs.map((l) => (l as any).sleepQuality).filter((s: number) => s > 0).slice(-5);
+
     const data = await callGeminiDirectly(userMessage, conversationHistory, {
       userName: profile.displayName || 'there',
+      age: profile.age || 30,
+      ageGroup: profile.ageGroup || 'adult',
       currentPhase: profile.currentPhase,
       weeksPostOp: calculateWeeksPostOp(profile.surgeryDate),
       daysPostOp: calculateDaysPostOp(profile.surgeryDate),
       graftType: profile.graftType === 'other' ? (profile.graftTypeCustom || 'other') : profile.graftType,
+      meniscusStatus: profile.meniscusStatus || 'unknown',
       recentSymptoms: [...new Set(recentSymptoms)],
       recentPainLevels,
+      recentSleepScores,
     });
 
     const aiMsg: ChatMessage = {
@@ -140,12 +148,13 @@ async function sendMessageLocal(
     };
     await appendMessage(aiMsg);
 
-    if (data.extractedSymptoms.length || data.painLevel != null || data.completedExercises.length) {
+    if (data.extractedSymptoms.length || data.painLevel != null || data.completedExercises.length || data.sleepQuality != null) {
       await upsertDailyLog({
         reportedSymptoms: data.extractedSymptoms,
         completedExercises: data.completedExercises,
         painLevel: data.painLevel ?? undefined,
         swellingLevel: data.swellingLevel ?? undefined,
+        sleepQuality: data.sleepQuality ?? undefined,
         llmSummary: data.conversationalResponse.substring(0, 500),
       });
     }

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
-import type { UserProfile, GraftType } from '@/src/types';
+import type { UserProfile, GraftType, MeniscusStatus, AgeGroup } from '@/src/types';
 
 interface AuthState {
   user: { uid: string; displayName: string; email: string } | null;
@@ -18,8 +18,10 @@ interface AuthContextValue extends AuthState {
     surgeryDate: Date;
     graftType: GraftType;
     graftTypeCustom?: string;
+    meniscusStatus: MeniscusStatus;
     initialPhase: number;
     name: string;
+    age: number;
   }) => Promise<void>;
 }
 
@@ -153,19 +155,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     surgeryDate: Date;
     graftType: GraftType;
     graftTypeCustom?: string;
+    meniscusStatus: MeniscusStatus;
     initialPhase: number;
     name: string;
+    age: number;
   }) => {
     const currentUser = state.user;
     if (!currentUser) throw new Error('No user signed in');
+
+    const ageGroup: AgeGroup = data.age < 25 ? 'adolescent' : data.age <= 40 ? 'adult' : 'older_adult';
 
     const profile: UserProfile = {
       uid: currentUser.uid,
       displayName: data.name || currentUser.displayName || '',
       email: currentUser.email || '',
+      age: data.age,
+      ageGroup,
       surgeryDate: data.surgeryDate,
       graftType: data.graftType,
       graftTypeCustom: data.graftTypeCustom,
+      meniscusStatus: data.meniscusStatus,
       currentPhase: data.initialPhase as UserProfile['currentPhase'],
       phaseUpdatedAt: new Date(),
       isPremium: true,

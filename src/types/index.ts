@@ -6,19 +6,26 @@ export type GraftType =
   | 'allograft'
   | 'other';
 
+export type MeniscusStatus = 'none' | 'repair' | 'meniscectomy' | 'unknown';
+
 export type RehabPhase = 1 | 2 | 3 | 4 | 5;
 
 export type SwellingLevel = 'none' | 'trace' | 'moderate' | 'severe';
 
 export type MessageRole = 'user' | 'assistant' | 'system';
 
+export type AgeGroup = 'adolescent' | 'adult' | 'older_adult';
+
 export interface UserProfile {
   uid: string;
   displayName: string;
   email: string;
+  age: number;
+  ageGroup: AgeGroup;
   surgeryDate: Date;
   graftType: GraftType;
   graftTypeCustom?: string;
+  meniscusStatus: MeniscusStatus;
   currentPhase: RehabPhase;
   phaseUpdatedAt: Date;
   isPremium: boolean;
@@ -41,6 +48,7 @@ export interface DailyLog {
   completedExercises: string[];
   painLevel: number;
   swellingLevel: SwellingLevel;
+  sleepQuality: number;
   llmSummary: string;
   createdAt: Date;
 }
@@ -82,11 +90,12 @@ export interface DVTCheckResult {
   severity: 'none' | 'warning' | 'critical';
 }
 
-export interface GeminiExtractedData {
+export interface LLMExtractedData {
   conversationalResponse: string;
   extractedSymptoms: string[];
   painLevel: number | null;
   swellingLevel: SwellingLevel | null;
+  sleepQuality: number | null;
   completedExercises: string[];
   moodIndicator: 'positive' | 'neutral' | 'negative' | null;
 }
